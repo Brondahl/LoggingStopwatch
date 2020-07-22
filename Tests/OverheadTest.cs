@@ -16,7 +16,7 @@ namespace Tests
             var total = 0;
             using (var timer = new LongOperationLoggingStopwatch("test", _ => { }))
             {
-                for (int i = 0; i < 10_000_000; i++)
+                for (int i = 0; i < 50_000_000; i++)
                 {
                     using (timer.TimeInnerOperation())
                     {
