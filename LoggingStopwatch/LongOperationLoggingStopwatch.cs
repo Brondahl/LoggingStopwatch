@@ -222,8 +222,7 @@ namespace LoggingStopwatch
         }
 
         /// <summary>
-        /// We'll make a new copy of this class for every loop, including
-        /// separate copies for loops running on separate threads.
+        /// We have a single copy of this for each outer loop, which gets `StartOperation` called on it repeatedly for each inner loop. 
         /// </summary>
         private class InnerOperationExecutionTimer : IDisposable
         {

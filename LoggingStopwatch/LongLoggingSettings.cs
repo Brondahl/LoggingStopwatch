@@ -6,14 +6,14 @@ using System;
 namespace LoggingStopwatch
 {
     /// <summary>
-    /// Defines <see cref="ExpectedNumberOfIterations"/>, <see cref="InnerOperationLoggingFrequency"/>, <see cref="ReportPercentageCompletion"/>, <see cref="ReportProjectedCompletionTime"/>, <see cref="ReportThreadCount"/> & <see cref="ReportPerThreadTime"/>
+    /// Defines <see cref="ExpectedNumberOfIterations"/>, <see cref="InnerOperationLoggingFrequency"/>, <see cref="ReportPercentageCompletion"/>, <see cref="ReportProjectedCompletionTime"/>, <see cref="ReportThreadCount"/> and <see cref="ReportPerThreadTime"/>
     /// </summary>
     public class LongLoggingSettings
     {
         /// <summary>
         /// How many times do we expect the inner loop to be called?
         /// Getting this prediction wrong won't cause any problems,
-        /// it will just lead to the %age and Completion Time reports
+        /// it will just lead to the percentage and Completion Time reports
         /// being inaccurate (if used).
         /// </summary>
         public int? ExpectedNumberOfIterations { get; set; }
@@ -41,9 +41,9 @@ namespace LoggingStopwatch
                 throw new ArgumentException($"{nameof(ReportPercentageCompletion)} and {nameof(ReportProjectedCompletionTime)} require {nameof(ExpectedNumberOfIterations)} to be provided.");
             }
 
-            if (ExpectedNumberOfIterations == 0)
+            if (ExpectedNumberOfIterations <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(ExpectedNumberOfIterations), $"{nameof(ExpectedNumberOfIterations)} cannot be 0!");
+                throw new ArgumentOutOfRangeException(nameof(ExpectedNumberOfIterations), $"{nameof(ExpectedNumberOfIterations)} must be strictly positive! (Received '{ExpectedNumberOfIterations}')");
             }
 
             if (ReportPerThreadTime && !ReportThreadCount)

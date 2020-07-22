@@ -10,7 +10,8 @@ namespace LoggingStopwatch
     /// </summary>
     public class FakeLongOperationLoggingStopwatch : FakeDisposable, ILongOperationLoggingStopwatch
     {
-        public IDisposable TimeInnerOperation() => new FakeDisposable();
+        private IDisposable inner = new FakeDisposable();
+        public IDisposable TimeInnerOperation() => inner;
     }
 
     public class FakeDisposable : IDisposable
