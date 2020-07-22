@@ -98,17 +98,18 @@ namespace LoggingStopwatch
         {
         }
         #endregion
-        
+
         /// <summary>
         /// Defines the block to be timed.
-        /// The overhead that calling this introduces on a single thread is around 0.15ns.
+        /// The overhead that calling this introduces on a single thread is around 0.15 microseconds.
         /// Overhead on multiple threads is hard to judge, but it certainly seems to be within an order of magnitude.
-        /// For comparison, DateTime.Now takes ~0.3ns and DateTime.UtcNow takes ~0.07ns
+        /// For comparison, DateTime.Now takes ~0.3 microseconds and DateTime.UtcNow takes ~0.07 microseconds
         ///
-        /// Note that if the logging frequency is low, then this can get much more expensive,
-        /// as building the logging string is non-trivial.
-        /// If logging is enabled on EVERY operation(even with a no-op logger!), then the
-        /// overhead jumps to about 2ns!
+        /// Note that if the logging frequency is low, then this can get much more expensive, as building
+        /// the logging string is non-trivial.
+        ///
+        /// If logging is enabled on EVERY operation (even with a no-op logger!), then the overhead jumps to
+        /// about 2 microseconds!
         /// </summary>
         /// <returns></returns>
         public IDisposable TimeInnerOperation()
