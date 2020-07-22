@@ -2,7 +2,7 @@
    **  Copyright Softwire 2020 ** 
    ****************************** */
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -53,8 +53,6 @@ namespace LoggingStopwatch
         private readonly LongLoggingSettings settings;
         private int iterationsCompleted = 0;
         private int activeExecutions = 0;
-        private readonly ConcurrentDictionary<int, TimeSpan> innerTimings = new ConcurrentDictionary<int, TimeSpan>();
-        private const int TotalInnerOperationRecord = -1; //ManagedThreadId is guaranteed to be positive.
         private readonly InnerOperationExecutionTimer innerTimingHandler;
 
         #region Constructors
@@ -101,6 +99,18 @@ namespace LoggingStopwatch
         }
         #endregion
         
+        /// <summary>
+        /// Defines the block to be timed.
+        /// The overhead that calling this introduces on a single thread is around 0.15ns.
+        /// Overhead on multiple threads is hard to judge, but it certainly seems to be within an order of magnitude.
+        /// For comparison, DateTime.Now takes ~0.3ns and DateTime.UtcNow takes ~0.07ns
+        ///
+        /// Note that if the logging frequency is low, then this can get much more expensive,
+        /// as building the logging string is non-trivial.
+        /// If logging is enabled on EVERY operation(even with a no-op logger!), then the
+        /// overhead jumps to about 2ns!
+        /// </summary>
+        /// <returns></returns>
         public IDisposable TimeInnerOperation()
         {
             Interlocked.Increment(ref activeExecutions);
@@ -109,76 +119,60 @@ namespace LoggingStopwatch
         }
 
         // Needs to be fully thread-safe!
-        private void RecordInnerExecutionComplete(TimeSpan elapsedTime, int threadId)
+        private void ReportInnerExecutionComplete()
         {
-            try
-            {
-                var newCompletedCount = Interlocked.Increment(ref iterationsCompleted);
-                var totalOuterElapsedTime_MS = base.timer.ElapsedMilliseconds;
+            var newCompletedCount = Interlocked.Increment(ref iterationsCompleted);
+            LogPerExecutionMessageIfAppropriate(settings, newCompletedCount, base.timer, base.Log);
+            Interlocked.Decrement(ref activeExecutions);
+        }
 
-                innerTimings.AddOrUpdate(
-                    TotalInnerOperationRecord,
-                    elapsedTime,
-                    (_, previousElapsedTotalTime) => previousElapsedTotalTime + elapsedTime);
-
-                if (settings.ReportPerThreadTime)
-                {
-                    innerTimings.AddOrUpdate(
-                        threadId,
-                        elapsedTime,
-                        (_, previousElapsedPerThreadTime) => previousElapsedPerThreadTime + elapsedTime);
-                }
-
-                var message = DeterminePerExecutionLoggingMessageIfAny(newCompletedCount, totalOuterElapsedTime_MS, settings);
-                if (message != null)
-                {
-                    Log(message);
-                }
-            }
-            catch (Exception e)
-            {
-                // We really don't expect exceptions above, but if anything goes
-                // wrong we don't want it to bring down the calling operation.
-                Log("Swallowing exception in LoggingStopwatch: " + e.ToString());
-            }
-            finally
-            {
-                Interlocked.Decrement(ref activeExecutions);
-            }
+        public override void Dispose()
+        {
+            LogFinalTimingReport();
         }
 
         // This is deliberately static, so that we're forced to explicitly pass in captured
         // values and can't use instance fields that might have been updated by other threads.
-        private static string DeterminePerExecutionLoggingMessageIfAny(int newCompletedCount, long totalOuterElapsedTime_MS, LongLoggingSettings settings)
+        // This is to ensure that it is fully threadsafe.
+        private static void LogPerExecutionMessageIfAppropriate(LongLoggingSettings settings, int newCompletedCount, Stopwatch outerStopwatch, Action<string> logAction)
         {
             if (newCompletedCount % settings.InnerOperationLoggingFrequency == 0)
             {
-                var logMessage = $"Progress: ({newCompletedCount}) operations completed.";
-
-                var completionPercentage = Decimal.Divide(newCompletedCount, settings.ExpectedNumberOfIterations ?? 1);
-
-                if (settings.ReportPercentageCompletion)
+                try
                 {
-                    logMessage += $"|{completionPercentage:0.00%}";
-                }
+                    var elapsedOuterTime_MS = outerStopwatch.ElapsedMilliseconds; //Dont pass in just the ElapsedMillis, since that's not completely trivial for it to calculate.
+                    var logMessage = $"Progress: ({newCompletedCount}) operations completed.";
 
-                if (settings.ReportProjectedCompletionTime)
+                    var completionPercentage = Decimal.Divide(newCompletedCount, settings.ExpectedNumberOfIterations ?? 1);
+
+                    if (settings.ReportPercentageCompletion)
+                    {
+                        logMessage += $"|{completionPercentage:0.00%}";
+                    }
+
+                    if (settings.ReportProjectedCompletionTime)
+                    {
+                        var remainingPercentage = 1 - completionPercentage;
+                        var remainingMultiplier = remainingPercentage / completionPercentage;
+
+                        var projectedTotalTimeRemaining_MS = elapsedOuterTime_MS * remainingMultiplier;
+                        var projectedOuterCompletionTime = DateTime.UtcNow.AddMilliseconds((double) projectedTotalTimeRemaining_MS);
+                        logMessage += $"|Projected completion time: {projectedOuterCompletionTime}Z (UTC)";
+                    }
+
+                    logAction(logMessage);
+                }
+                catch (Exception e)
                 {
-                    var remainingPercentage = 1 - completionPercentage;
-                    var remainingMultiplier = remainingPercentage / completionPercentage;
-
-                    var projectedTotalTimeRemaining_MS = totalOuterElapsedTime_MS * remainingMultiplier;
-                    var projectedOuterCompletionTime = DateTime.UtcNow.AddMilliseconds((double) projectedTotalTimeRemaining_MS);
-                    logMessage += $"|Projected completion time: {projectedOuterCompletionTime}Z (UTC)";
+                    // We really don't expect exceptions above, but if anything goes
+                    // wrong we don't want it to bring down the calling operation.
+                    logAction("Swallowing exception in LoggingStopwatch: " + e.ToString());
                 }
-
-                return logMessage;
             }
 
-            return null;
         }
 
-        public override void Dispose()
+        public void LogFinalTimingReport()
         {
             var overallTime = base.timer.Elapsed;
             //TODO: What about errors?
@@ -194,11 +188,10 @@ namespace LoggingStopwatch
                 return;
             }
 
-            var threadCountMessage = $"Inner operations were spread over {innerTimings.Keys.Count} thread(s):";
+            var threadCountMessage = $"Inner operations were spread over {innerTimingHandler.DistinctThreads} thread(s):";
 
             //Log the high-level results.
-            var innerTotalTimeSpan = innerTimings[TotalInnerOperationRecord];
-            var primaryLogMessage = $"Completed|{iterationsCompleted} Inner operations ran for a linear total of: {innerTotalTimeSpan}|The outer scope ran for an elapsed time of: {overallTime}";
+            var primaryLogMessage = $"Completed|{iterationsCompleted} Inner operations ran for a linear total of: {innerTimingHandler.TotalLinearTime}|The outer scope ran for an elapsed time of: {overallTime}";
             if (settings.ReportThreadCount && !settings.ReportPerThreadTime)
             {
                 primaryLogMessage += $"|{threadCountMessage}";
@@ -209,16 +202,16 @@ namespace LoggingStopwatch
             //Log per-thread results if requested.
             if (settings.ReportPerThreadTime)
             {
-                var innerThreadTimes = innerTimings.Where(kvp => kvp.Key != TotalInnerOperationRecord).Select(kvp => kvp.Value).ToArray();
+                var innerThreadTimes = innerTimingHandler.ListAllThreadTimes();
 
-                if (innerThreadTimes.Length == 1)
+                if (innerThreadTimes.Count == 1)
                 {
                     Log("All inner operations ran on a single thread.");
                 }
                 else
                 {
                     Log(threadCountMessage);
-                    for (int i = 0; i < innerThreadTimes.Length; i++)
+                    for (int i = 0; i < innerThreadTimes.Count; i++)
                     {
                         var threadTimeSpan = innerThreadTimes[i];
                         Log($"| - Time spent on thread #{i}: {threadTimeSpan}");
@@ -234,7 +227,7 @@ namespace LoggingStopwatch
         private class InnerOperationExecutionTimer : IDisposable
         {
             private readonly LongOperationLoggingStopwatch parent;
-            private readonly ThreadLocal<Stopwatch> timer = new ThreadLocal<Stopwatch>(() => new Stopwatch(), false);
+            private readonly ThreadLocal<Stopwatch> timer = new ThreadLocal<Stopwatch>(() => new Stopwatch(), true);
             
             public InnerOperationExecutionTimer(LongOperationLoggingStopwatch parent)
             {
@@ -243,16 +236,18 @@ namespace LoggingStopwatch
 
             public void StartOperation()
             {
-                timer.Value.Restart();
+                timer.Value.Start();
             }
 
             public void Dispose()
             {
-                var elapsed = timer.Value.Elapsed;
-                var threadId = Thread.CurrentThread.ManagedThreadId;
-                parent.RecordInnerExecutionComplete(elapsed, threadId);
+                timer.Value.Stop();
+                parent.ReportInnerExecutionComplete();
             }
 
+            public IList<TimeSpan> ListAllThreadTimes() => timer.Values.Select(watch => watch.Elapsed).ToArray();
+            public int DistinctThreads => timer.Values.Count;
+            public TimeSpan TotalLinearTime => new TimeSpan(timer.Values.Sum(watches => watches.ElapsedTicks));
         }
     }
 }
