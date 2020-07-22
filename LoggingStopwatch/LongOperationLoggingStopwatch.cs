@@ -215,7 +215,7 @@ namespace LoggingStopwatch
                     for (int i = 0; i < innerThreadTimes.Count; i++)
                     {
                         var threadTimeSpan = innerThreadTimes[i];
-                        Log($"| - Time spent on thread #{i}: {threadTimeSpan}");
+                        Log($" - Time spent on thread #{i}: {threadTimeSpan}");
                     }
                 }
             }
