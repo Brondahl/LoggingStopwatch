@@ -17,7 +17,7 @@ namespace Tests
                 Console.WriteLine,
                 new LongLoggingSettings
                 {
-                    InnerOperationLoggingFrequency = TestReps / 2,
+                    InnerOperationLoggingPeriod = TestReps / 2,
                     ReportPerThreadTime = true
                 });
 
@@ -99,7 +99,7 @@ namespace Tests
         public void SingleThreaded_LowVolume_Baseline_Increment()
         {
             var total = 0;
-            using (var timer = new LongOperationLoggingStopwatch("test", _ => { }, new LongLoggingSettings { InnerOperationLoggingFrequency = 1 }))
+            using (var timer = new LongOperationLoggingStopwatch("test", _ => { }, new LongLoggingSettings { InnerOperationLoggingPeriod = 1 }))
             {
                 for (int i = 0; i < 1_000_000; i++)
                 {
@@ -113,7 +113,7 @@ namespace Tests
         public void SingleThreaded_LowVolume_OverheadTest_WithLogging()
         {
             var total = 0;
-            using (var timer = new LongOperationLoggingStopwatch("test", _ => { }, new LongLoggingSettings { InnerOperationLoggingFrequency = 1 }))
+            using (var timer = new LongOperationLoggingStopwatch("test", _ => { }, new LongLoggingSettings { InnerOperationLoggingPeriod = 1 }))
             {
                 for (int i = 0; i < 1_000_000; i++)
                 {

@@ -19,7 +19,7 @@ namespace LoggingStopwatch
         public int? ExpectedNumberOfIterations { get; set; }
 
         /// <summary>How frequently should the progress of inner operations be logged. default is 1, i.e. after every loop of the inner operation</summary>
-        public int InnerOperationLoggingFrequency { get; set; } = 1;
+        public int InnerOperationLoggingPeriod { get; set; } = 1;
         
         /// <summary>Reports what proportion of the Expected iterations have been completed. <c>True</c> by default</summary>
         public bool ReportPercentageCompletion { get; set; } = true;

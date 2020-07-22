@@ -3,6 +3,7 @@
    ****************************** */
 using System;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace LoggingStopwatch
 {
@@ -27,6 +28,7 @@ namespace LoggingStopwatch
         private readonly IStopwatchLogger logger;
         protected readonly Stopwatch timer = new Stopwatch();
 
+        #region Constructors
         /// <summary>
         /// Starts a System.Diagnostics.Stopwatch on construction, and logs the elapsed time when `.Dispose()` is called.
         /// </summary>
@@ -35,7 +37,7 @@ namespace LoggingStopwatch
         /// A random unique identifier will be generated in addition to this, so that multiple executions are distinguishable.
         /// </param>
         /// <param name="logger">
-        /// Logger object to perform the logging when appropriate
+        /// Logger object to perform the logging when appropriate. 
         /// </param>
         /// <param name="logAtStart">
         /// Indicates whether a log record should be written at the start of the process.
@@ -59,8 +61,18 @@ namespace LoggingStopwatch
         /// <param name="loggingAction">Method to call whenever some text should be logged.</param>
         /// <param name="logAtStart">Defers to Inherited paramDoc</param>
         public LoggingStopwatch(string identifier, Action<string> loggingAction, bool logAtStart = false)
-            :this(identifier, new LambdaLogger(loggingAction), logAtStart)
+            : this(identifier, new LambdaLogger(loggingAction), logAtStart)
         { }
+
+        //Note if you copy-paste this code, feel free to delete this if you don't want the Microsoft.Extensions.Logging dependency.
+        /// <inheritdoc/>
+        /// <param name="identifier">Defers to Inherited paramDoc</param>
+        /// <param name="microsoftLogger">Accepts an <see cref="ILogger"/> and logs to it at the <see cref="LogLevel.Information"/> level.</param>
+        /// <param name="logAtStart">Defers to Inherited paramDoc</param>
+        public LoggingStopwatch(string identifier, ILogger microsoftLogger, bool logAtStart = false)
+            : this(identifier, new MicrosoftLoggerWrapper(microsoftLogger), logAtStart)
+        { }
+        #endregion
 
         protected void Log(string text)
         {

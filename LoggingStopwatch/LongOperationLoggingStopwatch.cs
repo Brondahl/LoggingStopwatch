@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace LoggingStopwatch
 {
@@ -97,6 +98,15 @@ namespace LoggingStopwatch
             : this(identifier, new LambdaLogger(loggingAction), settings)
         {
         }
+
+        //Note if you copy-paste this code, feel free to delete this if you don't want the Microsoft.Extensions.Logging dependency.
+        /// <inheritdoc/>
+        /// <param name="identifier">Defers to Inherited paramDoc</param>
+        /// <param name="microsoftLogger">Accepts an <see cref="ILogger"/> and logs to it at the <see cref="LogLevel.Information"/> level.</param>
+        /// <param name="logAtStart">Defers to Inherited paramDoc</param>
+        public LongOperationLoggingStopwatch(string identifier, ILogger microsoftLogger, LongLoggingSettings settings = null)
+            : this(identifier, new MicrosoftLoggerWrapper(microsoftLogger), settings)
+        { }
         #endregion
 
         /// <summary>
@@ -137,28 +147,31 @@ namespace LoggingStopwatch
         // This is to ensure that it is fully threadsafe.
         private static void LogPerExecutionMessageIfAppropriate(LongLoggingSettings settings, int newCompletedCount, Stopwatch outerStopwatch, Action<string> logAction)
         {
-            if (newCompletedCount % settings.InnerOperationLoggingFrequency == 0)
+            if (newCompletedCount % settings.InnerOperationLoggingPeriod == 0)
             {
                 try
                 {
                     var elapsedOuterTime_MS = outerStopwatch.ElapsedMilliseconds; //Dont pass in just the ElapsedMillis, since that's not completely trivial for it to calculate.
                     var logMessage = $"Progress: ({newCompletedCount}) operations completed.";
 
-                    var completionPercentage = Decimal.Divide(newCompletedCount, settings.ExpectedNumberOfIterations ?? 1);
-
-                    if (settings.ReportPercentageCompletion)
+                    if (settings.ExpectedNumberOfIterations.HasValue)
                     {
-                        logMessage += $"|{completionPercentage:0.00%}";
-                    }
+                        var completionPercentage = Decimal.Divide(newCompletedCount, settings.ExpectedNumberOfIterations.Value);
 
-                    if (settings.ReportProjectedCompletionTime)
-                    {
-                        var remainingPercentage = 1 - completionPercentage;
-                        var remainingMultiplier = remainingPercentage / completionPercentage;
+                        if (settings.ReportPercentageCompletion)
+                        {
+                            logMessage += $"|{completionPercentage:0.00%}";
+                        }
 
-                        var projectedTotalTimeRemaining_MS = elapsedOuterTime_MS * remainingMultiplier;
-                        var projectedOuterCompletionTime = DateTime.UtcNow.AddMilliseconds((double) projectedTotalTimeRemaining_MS);
-                        logMessage += $"|Projected completion time: {projectedOuterCompletionTime}Z (UTC)";
+                        if (settings.ReportProjectedCompletionTime)
+                        {
+                            var remainingPercentage = 1 - completionPercentage;
+                            var remainingMultiplier = remainingPercentage / completionPercentage;
+
+                            var projectedTotalTimeRemaining_MS = elapsedOuterTime_MS * remainingMultiplier;
+                            var projectedOuterCompletionTime = DateTime.UtcNow.AddMilliseconds((double) projectedTotalTimeRemaining_MS);
+                            logMessage += $"|Projected completion time: {projectedOuterCompletionTime}Z (UTC)";
+                        }
                     }
 
                     logAction(logMessage);
