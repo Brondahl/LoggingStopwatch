@@ -55,6 +55,7 @@ namespace LoggingStopwatch
         private int activeExecutions = 0;
         private readonly ConcurrentDictionary<int, TimeSpan> innerTimings = new ConcurrentDictionary<int, TimeSpan>();
         private const int TotalInnerOperationRecord = -1; //ManagedThreadId is guaranteed to be positive.
+        private readonly InnerOperationExecutionTimer innerTimingHandler;
 
         #region Constructors
         /// <inheritdoc cref="LongOperationLoggingStopwatch"/>
@@ -74,6 +75,7 @@ namespace LoggingStopwatch
             settings?.Validate();
             settings = loggingSettings ?? new LongLoggingSettings();
             LogInitiationMessage();
+            innerTimingHandler = new InnerOperationExecutionTimer(this);
             base.timer.Start(); // Zero out the time taken in this ctor, since the end of the base ctor.
         }
 
@@ -102,7 +104,8 @@ namespace LoggingStopwatch
         public IDisposable TimeInnerOperation()
         {
             Interlocked.Increment(ref activeExecutions);
-            return new InnerOperationExecution(this);
+            innerTimingHandler.StartOperation();
+            return innerTimingHandler;
         }
 
         // Needs to be fully thread-safe!
@@ -228,23 +231,28 @@ namespace LoggingStopwatch
         /// We'll make a new copy of this class for every loop, including
         /// separate copies for loops running on separate threads.
         /// </summary>
-        private class InnerOperationExecution : IDisposable
+        private class InnerOperationExecutionTimer : IDisposable
         {
             private readonly LongOperationLoggingStopwatch parent;
-            private readonly Stopwatch timer = new Stopwatch();
-
-            public InnerOperationExecution(LongOperationLoggingStopwatch parent)
+            private readonly ThreadLocal<Stopwatch> timer = new ThreadLocal<Stopwatch>(() => new Stopwatch(), false);
+            
+            public InnerOperationExecutionTimer(LongOperationLoggingStopwatch parent)
             {
                 this.parent = parent;
-                timer.Start();
+            }
+
+            public void StartOperation()
+            {
+                timer.Value.Restart();
             }
 
             public void Dispose()
             {
-                var elapsed = timer.Elapsed;
+                var elapsed = timer.Value.Elapsed;
                 var threadId = Thread.CurrentThread.ManagedThreadId;
                 parent.RecordInnerExecutionComplete(elapsed, threadId);
             }
+
         }
     }
 }
