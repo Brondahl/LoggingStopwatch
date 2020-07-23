@@ -32,10 +32,10 @@ namespace LoggingStopwatch
         /// <summary>Logs a record when the outer timer is initialised. <c>True</c> by default</summary>
         public bool ReportOuterTimerStart { get; set; } = true;
 
-        /// <summary>Reports what proportion of the Expected iterations have been completed. <c>True</c> by default</summary>
+        /// <summary>Reports what proportion of the Expected iterations have been completed. <c>True</c> by default. Disabled if <see cref="ExpectedNumberOfIterations"/> is not provided</summary>
         public bool ReportPercentageCompletion { get; set; } = true;
 
-        /// <summary>Reports a simple linear extrapolation of the completion time of the overall process. <c>True</c> by default</summary>
+        /// <summary>Reports a simple linear extrapolation of the completion time of the overall process. <c>True</c> by default. Disabled if <see cref="ExpectedNumberOfIterations"/> is not provided</summary>
         public bool ReportProjectedCompletionTime { get; set; } = true;
 
         /// <summary>Reports on how many distinct threads were utilised.<c>False</c> by default</summary>
@@ -46,10 +46,10 @@ namespace LoggingStopwatch
 
         internal void Validate()
         {
-            if (ExpectedNumberOfIterations == null &&
-                (ReportPercentageCompletion || ReportProjectedCompletionTime))
+            if (ExpectedNumberOfIterations == null)
             {
-                throw new ArgumentException($"{nameof(ReportPercentageCompletion)} and {nameof(ReportProjectedCompletionTime)} require {nameof(ExpectedNumberOfIterations)} to be provided.");
+                ReportPercentageCompletion = false;
+                ReportProjectedCompletionTime = false;
             }
 
             if (ExpectedNumberOfIterations <= 0)
