@@ -87,7 +87,10 @@ namespace LoggingStopwatch
                 initiationMessage += $"|Expecting to complete {reps} iterations of the inner operation.";
             }
 
-            Log(initiationMessage);
+            if (settings.ReportOuterTimerStart)
+            {
+                Log(initiationMessage);
+            }
         }
 
         /// <inheritdoc/>

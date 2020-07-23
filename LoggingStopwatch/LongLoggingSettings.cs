@@ -6,7 +6,15 @@ using System;
 namespace LoggingStopwatch
 {
     /// <summary>
-    /// Defines <see cref="ExpectedNumberOfIterations"/>, <see cref="InnerOperationLoggingFrequency"/>, <see cref="ReportPercentageCompletion"/>, <see cref="ReportProjectedCompletionTime"/>, <see cref="ReportThreadCount"/> and <see cref="ReportPerThreadTime"/>
+    /// Defines
+    ///     <see cref="ExpectedNumberOfIterations"/>,
+    ///     <see cref="InnerOperationLoggingPeriod"/>,
+    ///     <see cref="ReportOuterTimerStart"/>
+    ///     <see cref="ReportPercentageCompletion"/>,
+    ///     <see cref="ReportProjectedCompletionTime"/>,
+    ///     <see cref="ReportThreadCount"/>
+    /// and
+    ///     <see cref="ReportPerThreadTime"/>
     /// </summary>
     public class LongLoggingSettings
     {
@@ -20,7 +28,10 @@ namespace LoggingStopwatch
 
         /// <summary>How frequently should the progress of inner operations be logged. default is 1, i.e. after every loop of the inner operation</summary>
         public int InnerOperationLoggingPeriod { get; set; } = 1;
-        
+
+        /// <summary>Logs a record when the outer timer is initialised. <c>True</c> by default</summary>
+        public bool ReportOuterTimerStart { get; set; } = true;
+
         /// <summary>Reports what proportion of the Expected iterations have been completed. <c>True</c> by default</summary>
         public bool ReportPercentageCompletion { get; set; } = true;
 
